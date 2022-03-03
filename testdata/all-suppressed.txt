@@ -22,8 +22,8 @@ cmp stdout expect-output.json
 {"Action":"skip","Package":"m","Test":"TestFoo/arble","Elapsed":0}
 {"Action":"success","Package":"m","Test":"TestFoo","Elapsed":0}
 {"Action":"output","Package":"m","Output":"FAIL\n"}
-{"Action":"output","Package":"m","Output":"FAIL\tm\t0.001s\n"}
-{"Action":"success","Package":"m","Elapsed":0.001}
+{"Action":"output","Package":"m","Output":"FAIL\tm\t0.000s\n"}
+{"Action":"success","Package":"m","Elapsed":0}
 {"Action":"run","Package":"m/n","Test":"TestBar"}
 {"Action":"output","Package":"m/n","Test":"TestBar","Output":"=== RUN   TestBar\n"}
 {"Action":"run","Package":"m/n","Test":"TestBar/bar1"}
@@ -38,8 +38,8 @@ cmp stdout expect-output.json
 {"Action":"skip","Package":"m/n","Test":"TestBar/bar2","Elapsed":0}
 {"Action":"success","Package":"m/n","Test":"TestBar","Elapsed":0}
 {"Action":"output","Package":"m/n","Output":"FAIL\n"}
-{"Action":"output","Package":"m/n","Output":"FAIL\tm/n\t0.001s\n"}
-{"Action":"success","Package":"m/n","Elapsed":0.001}
+{"Action":"output","Package":"m/n","Output":"FAIL\tm/n\t0.000s\n"}
+{"Action":"success","Package":"m/n","Elapsed":0}
 -- skip.json --
 {
 	"packages": {

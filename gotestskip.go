@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -34,9 +35,9 @@ It can be run under gotestsum as:
 `[1:])
 }
 
-// omitTime causes the Time field to be omitted from the output,
+// omitTime causes the JSON output to be made predictable
 // making it easier to compare test output.
-var omitTime = false
+var predictableOutput = false
 
 // event represents a go test -json event.
 type event struct {
@@ -130,8 +131,8 @@ func mainErr() error {
 		if e.Action == "fail" {
 			ok = false
 		}
-		if omitTime {
-			e.Time = nil
+		if predictableOutput {
+			makePredictable(&e)
 		}
 		if err := enc.Encode(e); err != nil {
 			return err
@@ -208,4 +209,24 @@ func translateFailToSkip(s string) string {
 		return indent + "--- SKIP:" + s1
 	}
 	return s
+}
+
+var testTimestampPat = regexp.MustCompile(`\(\d+\.\d+s\)\n`)
+var packageTimestampPat = regexp.MustCompile(`\d+\.\d+s\n`)
+
+// makePredictable makes event output predictable for tests by
+// removing timestamps and changing test timings to zero.
+func makePredictable(e *event) {
+	e.Time = nil
+	if e.Elapsed != nil {
+		*e.Elapsed = 0
+	}
+	if e.Action != "output" {
+		return
+	}
+	if e.Test != "" {
+		e.Output = testTimestampPat.ReplaceAllString(e.Output, "(0.00s)\n")
+	} else {
+		e.Output = packageTimestampPat.ReplaceAllString(e.Output, "0.000s\n")
+	}
 }

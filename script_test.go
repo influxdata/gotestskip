@@ -19,7 +19,7 @@ func TestScript(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	omitTime = true
+	predictableOutput = true
 	os.Exit(testscript.RunMain(m, map[string]func() int{
 		"gotestskip": Main,
 	}))
