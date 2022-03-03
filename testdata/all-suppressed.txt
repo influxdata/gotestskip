@@ -1,3 +1,7 @@
+# Tests to ensure we are marking all failed tests referenced by "skip.json" as
+# skipped in the output. Given that no tests we aren't observing are failing,
+# the command should result in a zero status code.
+
 env GO_SKIP_TESTS=skip.json
 gotestskip -p 1 ./...
 cmp stdout expect-output.json
