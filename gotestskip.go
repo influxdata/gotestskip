@@ -195,20 +195,9 @@ func parents(test string) []string {
 	}
 }
 
-// translateFailToSkip translates a FAIL: output line
-// to a SKIP: line, respecting indentation.
+// translateFailToSkip translates a "FAIL:" output line to a "SKIP:".
 func translateFailToSkip(s string) string {
-	i := 0
-	for ; i < len(s); i++ {
-		if s[i] != ' ' {
-			break
-		}
-	}
-	indent := s[:i]
-	if s1 := strings.TrimLeft(s, "--- FAIL:"); len(s1) != len(s) {
-		return indent + "--- SKIP:" + s1
-	}
-	return s
+	return strings.Replace(s, "--- FAIL:", "--- SKIP:", 1)
 }
 
 var testTimestampPat = regexp.MustCompile(`\(\d+\.\d+s\)\n`)

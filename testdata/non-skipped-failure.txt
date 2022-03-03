@@ -34,11 +34,11 @@ cmp stdout expect-output.json
 {"Action":"output","Package":"m/n","Test":"TestBar/bar1","Output":"=== RUN   TestBar/bar1\n"}
 {"Action":"run","Package":"m/n","Test":"TestBar/bar2"}
 {"Action":"output","Package":"m/n","Test":"TestBar/bar2","Output":"=== RUN   TestBar/bar2\n"}
-{"Action":"output","Package":"m/n","Test":"TestBar/bar2","Output":"    --- SKIP:n_test.go:9: bar2 failure\n"}
+{"Action":"output","Package":"m/n","Test":"TestBar/bar2","Output":"    n_test.go:9: bar2 failure\n"}
 {"Action":"output","Package":"m/n","Test":"TestBar","Output":"--- FAIL: TestBar (0.00s)\n"}
 {"Action":"output","Package":"m/n","Test":"TestBar/bar1","Output":"    --- PASS: TestBar/bar1 (0.00s)\n"}
 {"Action":"pass","Package":"m/n","Test":"TestBar/bar1","Elapsed":0}
-{"Action":"output","Package":"m/n","Test":"TestBar/bar2","Output":"    --- SKIP:TestBar/bar2 (0.00s)\n"}
+{"Action":"output","Package":"m/n","Test":"TestBar/bar2","Output":"    --- SKIP: TestBar/bar2 (0.00s)\n"}
 {"Action":"skip","Package":"m/n","Test":"TestBar/bar2","Elapsed":0}
 {"Action":"success","Package":"m/n","Test":"TestBar","Elapsed":0}
 {"Action":"output","Package":"m/n","Output":"FAIL\n"}
