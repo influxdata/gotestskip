@@ -1,0 +1,61 @@
+# Tests that the program handles a failure case if no skip operations are applied.
+
+env GO_SKIP_TESTS=skip.json
+! gotestskip -p 1 ./...
+cmp stdout expect-output.json
+
+-- expect-output.json --
+{"Action":"run","Package":"m","Test":"TestFoo"}
+{"Action":"output","Package":"m","Test":"TestFoo","Output":"=== RUN   TestFoo\n"}
+{"Action":"run","Package":"m","Test":"TestFoo/bar"}
+{"Action":"output","Package":"m","Test":"TestFoo/bar","Output":"=== RUN   TestFoo/bar\n"}
+{"Action":"run","Package":"m","Test":"TestFoo/baz"}
+{"Action":"output","Package":"m","Test":"TestFoo/baz","Output":"=== RUN   TestFoo/baz\n"}
+{"Action":"output","Package":"m","Test":"TestFoo/baz","Output":"    tst_test.go:9: some reason\n"}
+{"Action":"output","Package":"m","Test":"TestFoo","Output":"--- FAIL: TestFoo (0.00s)\n"}
+{"Action":"output","Package":"m","Test":"TestFoo/bar","Output":"    --- PASS: TestFoo/bar (0.00s)\n"}
+{"Action":"pass","Package":"m","Test":"TestFoo/bar","Elapsed":0}
+{"Action":"output","Package":"m","Test":"TestFoo/baz","Output":"    --- FAIL: TestFoo/baz (0.00s)\n"}
+{"Action":"fail","Package":"m","Test":"TestFoo/baz","Elapsed":0}
+{"Action":"fail","Package":"m","Test":"TestFoo","Elapsed":0}
+{"Action":"output","Package":"m","Output":"FAIL\n"}
+{"Action":"output","Package":"m","Output":"FAIL\tm\t0.000s\n"}
+{"Action":"fail","Package":"m","Elapsed":0}
+{"Action":"run","Package":"m/n","Test":"TestBar"}
+{"Action":"output","Package":"m/n","Test":"TestBar","Output":"=== RUN   TestBar\n"}
+{"Action":"run","Package":"m/n","Test":"TestBar/bar1"}
+{"Action":"output","Package":"m/n","Test":"TestBar/bar1","Output":"=== RUN   TestBar/bar1\n"}
+{"Action":"output","Package":"m/n","Test":"TestBar","Output":"--- PASS: TestBar (0.00s)\n"}
+{"Action":"output","Package":"m/n","Test":"TestBar/bar1","Output":"    --- PASS: TestBar/bar1 (0.00s)\n"}
+{"Action":"pass","Package":"m/n","Test":"TestBar/bar1","Elapsed":0}
+{"Action":"pass","Package":"m/n","Test":"TestBar","Elapsed":0}
+{"Action":"output","Package":"m/n","Output":"PASS\n"}
+{"Action":"output","Package":"m/n","Output":"ok  \tm/n\t0.000s\n"}
+{"Action":"pass","Package":"m/n","Elapsed":0}
+-- skip.json --
+{}
+-- go.mod --
+module m
+
+go 1.18
+-- n/n_test.go --
+package n_test
+
+import "testing"
+
+func TestBar(t *testing.T) {
+	t.Run("bar1", func(t *testing.T) {
+	})
+}
+-- tst_test.go --
+package m_test
+
+import "testing"
+
+func TestFoo(t *testing.T) {
+	t.Run("bar", func(t *testing.T) {
+	})
+	t.Run("baz", func(t *testing.T) {
+		t.Fatal("some reason")
+	})
+}
