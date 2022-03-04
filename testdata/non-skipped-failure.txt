@@ -1,9 +1,9 @@
-# Tests to ensure we are marking all failed tests referenced by "skip.json" as
-# skipped in the output. Given that no tests we aren't observing are failing,
-# the command should result in a zero status code.
+# Tests for failures in packages we aren't considering flakey in the "skip.json"
+# file. These failures should result in a non-zero status code regardless of
+# whether or not we're actively skipping flakey tests.
 
 env GO_SKIP_TESTS=skip.json
-gotestskip -p 1 ./...
+! gotestskip -p 1 ./...
 cmp stdout expect-output.json
 
 -- expect-output.json --
@@ -14,20 +14,20 @@ cmp stdout expect-output.json
 {"Action":"run","Package":"m","Test":"TestFoo/baz"}
 {"Action":"output","Package":"m","Test":"TestFoo/baz","Output":"=== RUN   TestFoo/baz\n"}
 {"Action":"output","Package":"m","Test":"TestFoo/baz","Output":"    tst_test.go:9: some reason\n"}
-{"Action":"run","Package":"m","Test":"TestFoo/arble"}
-{"Action":"output","Package":"m","Test":"TestFoo/arble","Output":"=== RUN   TestFoo/arble\n"}
-{"Action":"output","Package":"m","Test":"TestFoo/arble","Output":"    tst_test.go:12: an error\n"}
+{"Action":"run","Package":"m","Test":"TestFoo/legit_failure"}
+{"Action":"output","Package":"m","Test":"TestFoo/legit_failure","Output":"=== RUN   TestFoo/legit_failure\n"}
+{"Action":"output","Package":"m","Test":"TestFoo/legit_failure","Output":"    tst_test.go:12: an error\n"}
 {"Action":"output","Package":"m","Test":"TestFoo","Output":"--- FAIL: TestFoo (0.00s)\n"}
 {"Action":"output","Package":"m","Test":"TestFoo/bar","Output":"    --- PASS: TestFoo/bar (0.00s)\n"}
 {"Action":"pass","Package":"m","Test":"TestFoo/bar","Elapsed":0}
 {"Action":"output","Package":"m","Test":"TestFoo/baz","Output":"    --- SKIP: TestFoo/baz (0.00s)\n"}
 {"Action":"skip","Package":"m","Test":"TestFoo/baz","Elapsed":0}
-{"Action":"output","Package":"m","Test":"TestFoo/arble","Output":"    --- SKIP: TestFoo/arble (0.00s)\n"}
-{"Action":"skip","Package":"m","Test":"TestFoo/arble","Elapsed":0}
-{"Action":"success","Package":"m","Test":"TestFoo","Elapsed":0}
+{"Action":"output","Package":"m","Test":"TestFoo/legit_failure","Output":"    --- FAIL: TestFoo/legit_failure (0.00s)\n"}
+{"Action":"fail","Package":"m","Test":"TestFoo/legit_failure","Elapsed":0}
+{"Action":"fail","Package":"m","Test":"TestFoo","Elapsed":0}
 {"Action":"output","Package":"m","Output":"FAIL\n"}
 {"Action":"output","Package":"m","Output":"FAIL\tm\t0.000s\n"}
-{"Action":"success","Package":"m","Elapsed":0}
+{"Action":"fail","Package":"m","Elapsed":0}
 {"Action":"run","Package":"m/n","Test":"TestBar"}
 {"Action":"output","Package":"m/n","Test":"TestBar","Output":"=== RUN   TestBar\n"}
 {"Action":"run","Package":"m/n","Test":"TestBar/bar1"}
@@ -49,9 +49,6 @@ cmp stdout expect-output.json
 	"packages": {
 		"m/n": {
 			"TestBar/bar2": true
-		},
-		"m": {
-			"TestFoo/arble": true
 		}
 	}
 }
@@ -82,7 +79,7 @@ func TestFoo(t *testing.T) {
 	t.Run("baz", func(t *testing.T) {
 		t.Skip("some reason")
 	})
-	t.Run("arble", func(t *testing.T) {
+	t.Run("legit failure", func(t *testing.T) {
 		t.Errorf("an error")
 	})
 }
