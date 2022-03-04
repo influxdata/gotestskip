@@ -1,0 +1,20 @@
+env GO_SKIP_TESTS=skip.yaml
+gotestskip -p 1 ./...
+
+-- skip.yaml --
+m:
+- TestFoo/bar 2022-03-04
+-- go.mod --
+module m
+
+go 1.18
+-- tst_test.go --
+package m_test
+
+import "testing"
+
+func TestFoo(t *testing.T) {
+	t.Run("bar", func(t *testing.T) {
+		t.Errorf("an error")
+	})
+}

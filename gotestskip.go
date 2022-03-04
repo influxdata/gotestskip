@@ -18,20 +18,24 @@ usage: gotestskip [go test args...]
 
 If $GO_SKIP_TESTS is empty or unset, this command functions
 like "go test -json ..."; otherwise is tries to read the file named
-by $GO_SKIP_TESTS, which should contain a file in the following
+by $GO_SKIP_TESTS, which should contain a file containing
+YAML in the following
 format:
 
 	somerepo.com/pkg0:
-		TestX/subtest
-		TestX/othertest
-		TestY
+	-TestX/subtest
+	-TestX/othertest
+	-TestY
 	somerepo.com/pkg1:
-		TestZ	2022-03-04
+	-TestZ 2022-03-04
 
-White space other than newlines is ignored (the indentation above
-is purely optional). A line with a final
-colon specifies a package name, which is followed by a newline-separated
-list of tests to skip for that repository. Skipping a test will skip all its subtests too.
+The top level key is the package to skip tests of. Each
+value inside that specifies a test to skip. Skipping a test will skip all its subtests too.
+
+Note that even when a test is marked to be skipped, it will still actually
+run - just any failure will cause the test to be marked as skipped rather
+than failing. This means that gotestskip is ineffectual at skipping tests
+that run for a very long time, or cause a panic, for example.
 
 The name of a test may be followed by a date in YYYY-MM-DD format,
 which can be used to specify when the test was skipped. This is checked
