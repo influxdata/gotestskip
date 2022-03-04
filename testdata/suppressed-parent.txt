@@ -2,7 +2,7 @@
 # skipped in the output. Given that no tests we aren't observing are failing,
 # the command should result in a zero status code.
 
-env GO_SKIP_TESTS=skip.json
+env GO_SKIP_TESTS=skip.yaml
 gotestskip -p 1 ./...
 cmp stdout expect-output.json
 
@@ -28,9 +28,9 @@ cmp stdout expect-output.json
 {"Action":"output","Package":"m","Output":"PASS\n"}
 {"Action":"output","Package":"m","Output":"ok  \tm\t0.000s\n"}
 {"Action":"success","Package":"m","Elapsed":0}
--- skip.json --
+-- skip.yaml --
 m:
-	TestFoo
+- TestFoo
 -- go.mod --
 module m
 
