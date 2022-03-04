@@ -1,0 +1,31 @@
+# Tests to ensure we are marking all failed tests referenced by "skip.json" as
+# skipped in the output. Given that no tests we aren't observing are failing,
+# the command should result in a zero status code.
+
+env GO_SKIP_TESTS=skip.json
+gotestskip -p 1 ./...
+cmp stdout expect-output.json
+
+-- expect-output.json --
+-- skip.json --
+m:
+	TestFoo
+-- go.mod --
+module m
+
+go 1.18
+-- tst_test.go --
+package m_test
+
+import "testing"
+
+func TestFoo(t *testing.T) {
+	t.Run("bar1", func(t *testing.T) {
+		t.Fatal("bar2 failure")
+	})
+	t.Run("bar2", func(t *testing.T) {
+		t.Fatal("bar2 failure")
+	})
+	t.Run("bar3", func(t *testing.T) {
+	})
+}

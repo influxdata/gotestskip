@@ -12,10 +12,6 @@ import (
 	"time"
 )
 
-type skipJSON struct {
-	Packages map[string]map[string]bool `json:"packages"`
-}
-
 func usage() {
 	fmt.Fprintf(os.Stderr, `
 usage: gotestskip [go test args...]
@@ -88,13 +84,9 @@ func mainErr() error {
 		}
 		return nil
 	}
-	f, err := os.ReadFile(skipFile)
+	skip, err := readSkipConfig(skipFile)
 	if err != nil {
 		return err
-	}
-	var skip skipJSON
-	if err := json.Unmarshal(f, &skip); err != nil {
-		return fmt.Errorf("cannot unmarshal %q: %v", skipFile, err)
 	}
 	r, err := cmd.StdoutPipe()
 	if err != nil {
