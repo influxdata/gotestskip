@@ -33,7 +33,6 @@ cmp stdout expect-output.json
 {"Action":"output","Package":"m/n","Output":"ok  \tm/n\t0.000s\n"}
 {"Action":"pass","Package":"m/n","Elapsed":0}
 -- skip.json --
-{}
 -- go.mod --
 module m
 

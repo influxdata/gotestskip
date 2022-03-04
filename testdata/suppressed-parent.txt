@@ -1,0 +1,52 @@
+# Tests to ensure we are marking all failed tests referenced by "skip.json" as
+# skipped in the output. Given that no tests we aren't observing are failing,
+# the command should result in a zero status code.
+
+env GO_SKIP_TESTS=skip.json
+gotestskip -p 1 ./...
+cmp stdout expect-output.json
+
+-- expect-output.json --
+{"Action":"run","Package":"m","Test":"TestFoo"}
+{"Action":"output","Package":"m","Test":"TestFoo","Output":"=== RUN   TestFoo\n"}
+{"Action":"run","Package":"m","Test":"TestFoo/bar1"}
+{"Action":"output","Package":"m","Test":"TestFoo/bar1","Output":"=== RUN   TestFoo/bar1\n"}
+{"Action":"output","Package":"m","Test":"TestFoo/bar1","Output":"    tst_test.go:7: bar2 failure\n"}
+{"Action":"run","Package":"m","Test":"TestFoo/bar2"}
+{"Action":"output","Package":"m","Test":"TestFoo/bar2","Output":"=== RUN   TestFoo/bar2\n"}
+{"Action":"output","Package":"m","Test":"TestFoo/bar2","Output":"    tst_test.go:10: bar2 failure\n"}
+{"Action":"run","Package":"m","Test":"TestFoo/bar3"}
+{"Action":"output","Package":"m","Test":"TestFoo/bar3","Output":"=== RUN   TestFoo/bar3\n"}
+{"Action":"output","Package":"m","Test":"TestFoo","Output":"--- SKIP: TestFoo (0.00s)\n"}
+{"Action":"output","Package":"m","Test":"TestFoo/bar1","Output":"    --- SKIP: TestFoo/bar1 (0.00s)\n"}
+{"Action":"skip","Package":"m","Test":"TestFoo/bar1","Elapsed":0}
+{"Action":"output","Package":"m","Test":"TestFoo/bar2","Output":"    --- SKIP: TestFoo/bar2 (0.00s)\n"}
+{"Action":"skip","Package":"m","Test":"TestFoo/bar2","Elapsed":0}
+{"Action":"output","Package":"m","Test":"TestFoo/bar3","Output":"    --- PASS: TestFoo/bar3 (0.00s)\n"}
+{"Action":"pass","Package":"m","Test":"TestFoo/bar3","Elapsed":0}
+{"Action":"skip","Package":"m","Test":"TestFoo","Elapsed":0}
+{"Action":"output","Package":"m","Output":"PASS\n"}
+{"Action":"output","Package":"m","Output":"ok  \tm\t0.000s\n"}
+{"Action":"success","Package":"m","Elapsed":0}
+-- skip.json --
+m:
+	TestFoo
+-- go.mod --
+module m
+
+go 1.18
+-- tst_test.go --
+package m_test
+
+import "testing"
+
+func TestFoo(t *testing.T) {
+	t.Run("bar1", func(t *testing.T) {
+		t.Fatal("bar2 failure")
+	})
+	t.Run("bar2", func(t *testing.T) {
+		t.Fatal("bar2 failure")
+	})
+	t.Run("bar3", func(t *testing.T) {
+	})
+}

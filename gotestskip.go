@@ -12,26 +12,34 @@ import (
 	"time"
 )
 
-type skipJSON struct {
-	Packages map[string]map[string]bool `json:"packages"`
-}
-
 func usage() {
 	fmt.Fprintf(os.Stderr, `
 usage: gotestskip [go test args...]
 
 If $GO_SKIP_TESTS is empty or unset, this command functions
 like "go test -json ..."; otherwise is tries to read the file named
-by $GO_SKIP_TESTS, which should contain a JSON object with the following
-schema:
+by $GO_SKIP_TESTS, which should contain a file in the following
+format:
 
-{
-	packages: [pkgName=_]: [string]: true
-}
+	somerepo.com/pkg0:
+		TestX/subtest
+		TestX/othertest
+		TestY
+	somerepo.com/pkg1:
+		TestZ	2022-03-04
+
+White space other than newlines is ignored (the indentation above
+is purely optional). A line with a final
+colon specifies a package name, which is followed by a newline-separated
+list of tests to skip for that repository. Skipping a test will skip all its subtests too.
+
+The name of a test may be followed by a date in YYYY-MM-DD format,
+which can be used to specify when the test was skipped. This is checked
+for syntax but otherwise ignored by this command.
 
 It can be run under gotestsum as:
 
-	gotestsum --raw-command -- gotestskip ./...
+	gotestsum --raw-command -- gotestskip $go_cmd_args
 `[1:])
 }
 
@@ -88,13 +96,9 @@ func mainErr() error {
 		}
 		return nil
 	}
-	f, err := os.ReadFile(skipFile)
+	skip, err := readSkipConfig(skipFile)
 	if err != nil {
 		return err
-	}
-	var skip skipJSON
-	if err := json.Unmarshal(f, &skip); err != nil {
-		return fmt.Errorf("cannot unmarshal %q: %v", skipFile, err)
 	}
 	r, err := cmd.StdoutPipe()
 	if err != nil {
@@ -114,27 +118,64 @@ func mainErr() error {
 			}
 			return fmt.Errorf("error decoding go test output: %v", err)
 		}
-		if skip.Packages[e.Package][e.Test] {
+		switch {
+		case shouldSkip(skip, e.Package, e.Test):
+			// The test is marked to be skipped.
 			switch e.Action {
 			case "fail":
 				e.Action = "skip"
 				wouldHaveFailed(e.Package, e.Test)
 			case "output":
-				e.Output = translateFailToSkip(e.Output)
+				translateFailOutput(&e, "SKIP")
+			case "run":
+				// The FAIL output for a parent test is produced
+				// before any of the FAIL (or Action: "fail") events
+				// of its subtests, so at that point we can't know
+				// whether to output FAIL or PASS.
+				// We could theoretically buffer output until the
+				// status of all subtests is known, but that's a bunch
+				// of complexity we don't want right now, so instead
+				// mark this test and its parents as skipping, so
+				// that we can delay the parent output until its status
+				// is known.
+				setSkipping(e.Package, e.Test)
 			}
-		} else if wouldHaveFailedMap[e.Package][e.Test] == suppressed && e.Action == "fail" {
-			// The failure is (almost certainly) because a failed subtest has been skipped.
-			e.Action = "success"
-		} else if e.Action == "fail" {
+		case getStatus(e.Package, e.Test) == statusSuppressed:
+			// A subtest has failed but was skipped.
+			// If the test has failed, it's almost certainly because of this.
+			switch e.Action {
+			case "fail":
+				if e.Test == "" {
+					// Package-level status is marked as "success" not "pass".
+					e.Action = "success"
+				} else {
+					e.Action = "pass"
+				}
+			case "output":
+				translateFailOutput(&e, "PASS")
+			}
+			if err := sendSavedEvents(enc, e.Package, e.Test, "PASS"); err != nil {
+				return err
+			}
+		case e.Action == "fail":
 			didFail(e.Package, e.Test)
+			if err := sendSavedEvents(enc, e.Package, e.Test, ""); err != nil {
+				return err
+			}
+		case getStatus(e.Package, e.Test) == statusSkipping && e.Action == "output":
+			// Buffer output of a parent test until we know the status of its subtests.
+			saveEvent(e.Package, e.Test, e)
+			continue
+
+		case e.Action == "pass":
+			if err := sendSavedEvents(enc, e.Package, e.Test, ""); err != nil {
+				return err
+			}
 		}
 		if e.Action == "fail" {
 			ok = false
 		}
-		if predictableOutput {
-			makePredictable(&e)
-		}
-		if err := enc.Encode(e); err != nil {
+		if err := sendEvent(enc, &e); err != nil {
 			return err
 		}
 	}
@@ -144,37 +185,114 @@ func mainErr() error {
 	return nil
 }
 
-type wouldFailStatus uint8
+type testStatus uint8
 
 const (
-	ok wouldFailStatus = iota
-	failed
-	suppressed
+	statusUnknown testStatus = iota
+	statusSkipping
+	statusFailed
+	statusSuppressed
 )
 
-var wouldHaveFailedMap = make(map[string]map[string]wouldFailStatus)
+var savedEvents = make(map[string]map[string][]event)
+
+func saveEvent(pkg, test string, e event) {
+	pm := savedEvents[pkg]
+	if pm == nil {
+		pm = make(map[string][]event)
+		savedEvents[pkg] = pm
+	}
+	pm[test] = append(pm[test], e)
+}
+
+func sendSavedEvents(enc *json.Encoder, pkg, test string, status string) error {
+	pm := savedEvents[pkg]
+	if pm == nil {
+		return nil
+	}
+	saved, ok := pm[test]
+	if ok {
+		delete(pm, test)
+	}
+	for i := range saved {
+		e := &saved[i]
+		if status != "" {
+			translateFailOutput(e, "PASS")
+		}
+		if err := sendEvent(enc, e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func sendEvent(enc *json.Encoder, e *event) error {
+	if predictableOutput {
+		makePredictable(e)
+	}
+	return enc.Encode(e)
+}
+
+var testStatusMap = make(map[string]map[string]testStatus)
+
+func getStatus(pkg, test string) testStatus {
+	return testStatusMap[pkg][test]
+}
+
+// shouldSkip reports whether a given test should
+// be skipped. A test is skipped if it or any of its parents
+// are marked to be skipped.
+func shouldSkip(skip *skipConfig, pkg, test string) bool {
+	pm := skip.Packages[pkg]
+	if pm == nil {
+		return false
+	}
+	for _, t := range parents(test) {
+		if pm[t] {
+			return true
+		}
+	}
+	return false
+}
 
 // didFail marks the given test and all its parents as failing
 // within the given package. This overrides any failure caused by
 // suppression.
 func didFail(pkg, test string) {
-	setStatus(pkg, test, failed)
+	setStatus(pkg, test, func(status testStatus) testStatus {
+		return statusFailed
+	})
 }
 
 // didFail marks the given test and all its parents as suppressed (skipped)
 // within the given package.
 func wouldHaveFailed(pkg, test string) {
-	setStatus(pkg, test, suppressed)
+	setStatus(pkg, test, func(status testStatus) testStatus {
+		if status != statusFailed {
+			status = statusSuppressed
+		}
+		return status
+	})
 }
 
-func setStatus(pkg, test string, status wouldFailStatus) {
-	pm := wouldHaveFailedMap[pkg]
+func setSkipping(pkg, test string) {
+	setStatus(pkg, test, func(status testStatus) testStatus {
+		if status == statusUnknown {
+			status = statusSkipping
+		}
+		return status
+	})
+}
+
+func setStatus(pkg, test string, getStatus func(oldStatus testStatus) testStatus) {
+	pm := testStatusMap[pkg]
 	if pm == nil {
-		pm = make(map[string]wouldFailStatus)
-		wouldHaveFailedMap[pkg] = pm
+		pm = make(map[string]testStatus)
+		testStatusMap[pkg] = pm
 	}
 	for _, t := range parents(test) {
-		if tstatus := pm[t]; tstatus != failed {
+		oldStatus := pm[t]
+		if status := getStatus(oldStatus); status != oldStatus {
 			pm[t] = status
 		}
 	}
@@ -195,9 +313,34 @@ func parents(test string) []string {
 	}
 }
 
-// translateFailToSkip translates a "FAIL:" output line to a "SKIP:".
-func translateFailToSkip(s string) string {
-	return strings.Replace(s, "--- FAIL:", "--- SKIP:", 1)
+// translateFailOutput translates a FAIL output line
+// to a SKIP or PASS line (specified by to), respecting indentation.
+func translateFailOutput(e *event, to string) {
+	if e.Test == "" {
+		// It's output at the package level. As the top level can never
+		// be skipped, we ignore to.
+		if e.Output == "FAIL\n" {
+			e.Output = "PASS\n"
+			return
+		}
+		if s := strings.TrimPrefix(e.Output, "FAIL\t"); len(s) != len(e.Output) {
+			// e.g. "FAIL\tpkg\t0.000s\n" -> "ok  \tpkg\t0.000s\n"
+			e.Output = "ok  \t" + s
+			return
+		}
+		return
+	}
+	s := e.Output
+	i := 0
+	for ; i < len(s); i++ {
+		if s[i] != ' ' {
+			break
+		}
+	}
+	indent := s[:i]
+	if s1 := strings.TrimPrefix(s[i:], "--- FAIL: "); len(s1) != len(s[i:]) {
+		e.Output = indent + "--- " + to + ": " + s1
+	}
 }
 
 var testTimestampPat = regexp.MustCompile(`\(\d+\.\d+s\)\n`)
