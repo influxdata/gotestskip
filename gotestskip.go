@@ -29,8 +29,19 @@ format:
 	somerepo.com/pkg1:
 	-TestZ 2022-03-04
 
-The top level key is the package to skip tests of. Each
+The top level key specifies a package in which to skip tests. Each
 value inside that specifies a test to skip. Skipping a test will skip all its subtests too.
+
+If $GO_SKIP_ROOT is set, it's used as the prefix for package names.
+So if GO_SKIP_ROOT is set to "somerepo.com", the
+above configuration can be specified as:
+
+	pkg0:
+	-TestX/subtest
+	-TestX/othertest
+	-TestY
+	pkg1:
+	-TestZ 2022-03-04
 
 Note that even when a test is marked to be skipped, it will still actually
 run - just any failure will cause the test to be marked as skipped rather
@@ -100,7 +111,7 @@ func mainErr() error {
 		}
 		return nil
 	}
-	skip, err := readSkipConfig(skipFile)
+	skip, err := readSkipConfig(skipFile, os.Getenv("GO_SKIP_ROOT"))
 	if err != nil {
 		return err
 	}

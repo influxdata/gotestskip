@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -13,7 +14,7 @@ type skipConfig struct {
 	Packages map[string]map[string]bool `json:"packages"`
 }
 
-func readSkipConfig(file string) (_ *skipConfig, err error) {
+func readSkipConfig(file string, rootPkg string) (_ *skipConfig, err error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -26,6 +27,9 @@ func readSkipConfig(file string) (_ *skipConfig, err error) {
 		Packages: make(map[string]map[string]bool),
 	}
 	for pkg, tests := range pkgs {
+		if rootPkg != "" {
+			pkg = path.Join(rootPkg, pkg)
+		}
 		pm := make(map[string]bool)
 		for _, test := range tests {
 			fields := strings.Fields(test)
