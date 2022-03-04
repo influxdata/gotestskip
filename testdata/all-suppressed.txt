@@ -17,32 +17,44 @@ cmp stdout expect-output.json
 {"Action":"run","Package":"m","Test":"TestFoo/arble"}
 {"Action":"output","Package":"m","Test":"TestFoo/arble","Output":"=== RUN   TestFoo/arble\n"}
 {"Action":"output","Package":"m","Test":"TestFoo/arble","Output":"    tst_test.go:12: an error\n"}
-{"Action":"output","Package":"m","Test":"TestFoo","Output":"--- FAIL: TestFoo (0.00s)\n"}
 {"Action":"output","Package":"m","Test":"TestFoo/bar","Output":"    --- PASS: TestFoo/bar (0.00s)\n"}
 {"Action":"pass","Package":"m","Test":"TestFoo/bar","Elapsed":0}
 {"Action":"output","Package":"m","Test":"TestFoo/baz","Output":"    --- SKIP: TestFoo/baz (0.00s)\n"}
 {"Action":"skip","Package":"m","Test":"TestFoo/baz","Elapsed":0}
 {"Action":"output","Package":"m","Test":"TestFoo/arble","Output":"    --- SKIP: TestFoo/arble (0.00s)\n"}
 {"Action":"skip","Package":"m","Test":"TestFoo/arble","Elapsed":0}
-{"Action":"success","Package":"m","Test":"TestFoo","Elapsed":0}
-{"Action":"output","Package":"m","Output":"FAIL\n"}
-{"Action":"output","Package":"m","Output":"FAIL\tm\t0.000s\n"}
+{"Action":"output","Package":"m","Test":"TestFoo","Output":"--- PASS: TestFoo (0.00s)\n"}
+{"Action":"pass","Package":"m","Test":"TestFoo","Elapsed":0}
+{"Action":"run","Package":"m","Test":"TestFoo2"}
+{"Action":"output","Package":"m","Test":"TestFoo2","Output":"=== RUN   TestFoo2\n"}
+{"Action":"run","Package":"m","Test":"TestFoo2/skipsuccess"}
+{"Action":"output","Package":"m","Test":"TestFoo2/skipsuccess","Output":"=== RUN   TestFoo2/skipsuccess\n"}
+{"Action":"output","Package":"m","Test":"TestFoo2/skipsuccess","Output":"    --- PASS: TestFoo2/skipsuccess (0.00s)\n"}
+{"Action":"pass","Package":"m","Test":"TestFoo2/skipsuccess","Elapsed":0}
+{"Action":"output","Package":"m","Test":"TestFoo2","Output":"--- PASS: TestFoo2 (0.00s)\n"}
+{"Action":"pass","Package":"m","Test":"TestFoo2","Elapsed":0}
+{"Action":"output","Package":"m","Output":"PASS\n"}
+{"Action":"output","Package":"m","Output":"ok  \tm\t0.000s\n"}
 {"Action":"success","Package":"m","Elapsed":0}
 {"Action":"run","Package":"m/n","Test":"TestBar"}
 {"Action":"output","Package":"m/n","Test":"TestBar","Output":"=== RUN   TestBar\n"}
+{"Action":"output","Package":"m/n","Test":"TestBar","Output":"    n_test.go:6: log1\n"}
 {"Action":"run","Package":"m/n","Test":"TestBar/bar1"}
 {"Action":"output","Package":"m/n","Test":"TestBar/bar1","Output":"=== RUN   TestBar/bar1\n"}
 {"Action":"run","Package":"m/n","Test":"TestBar/bar2"}
 {"Action":"output","Package":"m/n","Test":"TestBar/bar2","Output":"=== RUN   TestBar/bar2\n"}
-{"Action":"output","Package":"m/n","Test":"TestBar/bar2","Output":"    n_test.go:9: bar2 failure\n"}
-{"Action":"output","Package":"m/n","Test":"TestBar","Output":"--- FAIL: TestBar (0.00s)\n"}
+{"Action":"output","Package":"m/n","Test":"TestBar/bar2","Output":"    n_test.go:10: bar2 failure\n"}
+{"Action":"cont","Package":"m/n","Test":"TestBar"}
 {"Action":"output","Package":"m/n","Test":"TestBar/bar1","Output":"    --- PASS: TestBar/bar1 (0.00s)\n"}
 {"Action":"pass","Package":"m/n","Test":"TestBar/bar1","Elapsed":0}
 {"Action":"output","Package":"m/n","Test":"TestBar/bar2","Output":"    --- SKIP: TestBar/bar2 (0.00s)\n"}
 {"Action":"skip","Package":"m/n","Test":"TestBar/bar2","Elapsed":0}
-{"Action":"success","Package":"m/n","Test":"TestBar","Elapsed":0}
-{"Action":"output","Package":"m/n","Output":"FAIL\n"}
-{"Action":"output","Package":"m/n","Output":"FAIL\tm/n\t0.000s\n"}
+{"Action":"output","Package":"m/n","Test":"TestBar","Output":"=== CONT  TestBar\n"}
+{"Action":"output","Package":"m/n","Test":"TestBar","Output":"    n_test.go:12: log2\n"}
+{"Action":"output","Package":"m/n","Test":"TestBar","Output":"--- PASS: TestBar (0.00s)\n"}
+{"Action":"pass","Package":"m/n","Test":"TestBar","Elapsed":0}
+{"Action":"output","Package":"m/n","Output":"PASS\n"}
+{"Action":"output","Package":"m/n","Output":"ok  \tm/n\t0.000s\n"}
 {"Action":"success","Package":"m/n","Elapsed":0}
 -- skip.json --
 {
@@ -51,7 +63,8 @@ cmp stdout expect-output.json
 			"TestBar/bar2": true
 		},
 		"m": {
-			"TestFoo/arble": true
+			"TestFoo/arble": true,
+			"TestFoo2/skipsuccess": true
 		}
 	}
 }
@@ -65,11 +78,13 @@ package n_test
 import "testing"
 
 func TestBar(t *testing.T) {
+	t.Logf("log1")
 	t.Run("bar1", func(t *testing.T) {
 	})
 	t.Run("bar2", func(t *testing.T) {
 		t.Fatal("bar2 failure")
 	})
+	t.Logf("log2")
 }
 -- tst_test.go --
 package m_test
@@ -85,4 +100,8 @@ func TestFoo(t *testing.T) {
 	t.Run("arble", func(t *testing.T) {
 		t.Errorf("an error")
 	})
+}
+
+func TestFoo2(t *testing.T) {
+	t.Run("skipsuccess", func(t *testing.T) {})
 }
