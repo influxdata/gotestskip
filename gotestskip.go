@@ -18,16 +18,28 @@ usage: gotestskip [go test args...]
 
 If $GO_SKIP_TESTS is empty or unset, this command functions
 like "go test -json ..."; otherwise is tries to read the file named
-by $GO_SKIP_TESTS, which should contain a JSON object with the following
-schema:
+by $GO_SKIP_TESTS, which should contain a file in the following
+format:
 
-{
-	packages: [pkgName=_]: [string]: true
-}
+	somerepo.com/pkg0:
+		TestX/subtest
+		TestX/othertest
+		TestY
+	somerepo.com/pkg1:
+		TestZ	2022-03-04
+
+White space other than newlines is ignored (the indentation above
+is purely optional). A line with a final
+colon specifies a package name, which is followed by a newline-separated
+list of tests to skip for that repository. Skipping a test will skip all its subtests too.
+
+The name of a test may be followed by a date in YYYY-MM-DD format,
+which can be used to specify when the test was skipped. This is checked
+for syntax but otherwise ignored by this command.
 
 It can be run under gotestsum as:
 
-	gotestsum --raw-command -- gotestskip ./...
+	gotestsum --raw-command -- gotestskip $go_cmd_args
 `[1:])
 }
 
@@ -107,7 +119,7 @@ func mainErr() error {
 			return fmt.Errorf("error decoding go test output: %v", err)
 		}
 		switch {
-		case skip.Packages[e.Package][e.Test]:
+		case shouldSkip(skip, e.Package, e.Test):
 			// The test is marked to be skipped.
 			switch e.Action {
 			case "fail":
@@ -225,6 +237,22 @@ var testStatusMap = make(map[string]map[string]testStatus)
 
 func getStatus(pkg, test string) testStatus {
 	return testStatusMap[pkg][test]
+}
+
+// shouldSkip reports whether a given test should
+// be skipped. A test is skipped if it or any of its parents
+// are marked to be skipped.
+func shouldSkip(skip *skipConfig, pkg, test string) bool {
+	pm := skip.Packages[pkg]
+	if pm == nil {
+		return false
+	}
+	for _, t := range parents(test) {
+		if pm[t] {
+			return true
+		}
+	}
+	return false
 }
 
 // didFail marks the given test and all its parents as failing
